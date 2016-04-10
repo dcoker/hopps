@@ -73,7 +73,8 @@ Replace `hopps-deploy-bucket` with the name of your deployment bucket.
 
 #### Configuring Hopps
 
-Example configuration:
+Hopps only supports simple TCP scans for now. Expectations must be stated
+with IP addresses (not hostnames) and port numbers. Here's an example:
 
     {
       "argv": [],
@@ -104,20 +105,22 @@ the config file. You can get this from the AWS Lambda Console or via the command
 Here's an example of how to get the bucket name from the command line and to copy the
 configuration there:
 
-    BUCKET=$(aws cloudformation describe-stacks \
+    aws cloudformation describe-stacks \
       --stack-name hopps \
-      --query Stacks[0].Outputs)
+      --query Stacks[0].Outputs
+    ...
     aws s3 cp hopps-config.json s3://${BUCKET}/
 
 #### Creating Scheduled Event
 
-AWS does not currently offer an API for creating the scheduled event. You can create one using the AWS Lambda Console
- by following these steps:
+AWS does not currently offer an API for creating the scheduled event. You can
+create one using the AWS Lambda Console by following these steps:
 
 1. Log in to the AWS Console and navigate to the CloudWatch service.
 2. Click "Events".
 3. Click "Create Rule".
-4. In "Event Selector" dropdown, select "Schedule". To run hourly, select a fixed rate of 1 hours.
+4. In "Event Selector" dropdown, select "Schedule". To run hourly, select a
+fixed rate of 1 hours.
 5. Click "Add Target".
 6. Select the name of the Lambda function from the dropdown.
 7. Click "Configure details"
