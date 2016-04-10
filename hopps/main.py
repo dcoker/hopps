@@ -16,16 +16,15 @@ from collections import namedtuple
 
 import boto3
 import gevent
+import gevent.pool
 from botocore.config import Config
-from gevent import pool
 from gevent import socket
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(filename)s:%(lineno)d: %(message)s')
 
 HostPort = namedtuple('HostPort', ['host', 'port'])
 
 
 def lambda_main(event, context):
+    logging.getLogger().setLevel(logging.INFO)
     logging.info("Event: %r" % event)
     # Extract the name of the S3 bucket containing the configuration file from the Description
     # of this lambda function.
@@ -34,20 +33,21 @@ def lambda_main(event, context):
     description = func['Configuration']['Description']
     json_portion = description[description.find("{"):]
     bucket = json.loads(json_portion)["ConfigBucket"]
-    config_path = "s3://%(bucket)s/hopps-config.json" % locals()
+    config_path = "s3://%s/hopps-config.json" % bucket
     logging.info("Reading config from %s" % config_path)
-    argv, expectations = get_configuration(config_path)
+    argv, expectations = read_config(config_path)
     start_scanning(create_argparser().parse_args(argv), expectations)
 
 
 def cli_main():
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s %(filename)s:%(lineno)d: %(message)s')
     logging.info("argv: %r" % (sys.argv,))
     args = create_argparser().parse_args()
-    _, expectations = get_configuration(args.config)
+    _, expectations = read_config(args.config)
     start_scanning(args, expectations)
 
 
-def get_configuration(filename):
+def read_config(filename):
     if not filename:
         return [], set([])
 

@@ -4,7 +4,7 @@ Hopps is a PoC security scanner for AWS. The port scan is run from Lambda via
 a scheduled event. Any EC2 instances in the same AWS account with public IPs
 will be port scanned and the results compared to a list of expectations
 (configured via a JSON file on S3). Results are published to a CloudWatch
-Metric, from which you can customize any alerting you wish.
+Metric, from which you can trigger any alerting you wish.
 
 ## Using Hopps
 
@@ -69,7 +69,7 @@ Replace `hopps-deploy-bucket` with the name of your deployment bucket.
       --template-body file://./cloudformation/hopps.template \
       --parameters \
         ParameterKey=DeployS3Bucket,ParameterValue=hopps-deploy-bucket \
-        ParameterKey=DeployS3Key,ParameterValue=latest/deploy.zip
+        ParameterKey=DeployS3Key,ParameterValue=hopps/latest.zip
 
 #### Configuring Hopps
 
