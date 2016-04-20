@@ -114,15 +114,17 @@ def start_scanning(args, expectations):
     gevent.signal(signal.SIGQUIT, gevent.kill)  # paranoia: ensure gevent respects sigquit
     logging.info("Configuration: %r" % (args,))
     ports_to_scan = parse_port_ranges(args.ports)
-    public_ips = list(find_public_ips())
-    logging.info("Found public IPs: %r" % public_ips)
-    ip_port_pairs = [HostPort(x, y) for x, y in itertools.product(public_ips, ports_to_scan)]
+
+    ip_to_instance_map = find_ec2_instance_ips()
+    logging.info("Found public instance IPs: %r" % sorted(ip_to_instance_map.keys()))
+    ip_port_pairs = [HostPort(x, y) for x, y in itertools.product(ip_to_instance_map.keys(), ports_to_scan)]
+
     random.shuffle(ip_port_pairs)
     logging.info("Scanning %d ip:port pairs." % (len(ip_port_pairs)))
 
     open_ports_collector = pooled_port_scan(args, ip_port_pairs)
 
-    num_unexpected = print_results(expectations, open_ports_collector)
+    num_unexpected = print_results(ip_to_instance_map, expectations, open_ports_collector)
     report_to_cloudwatch(args.cloudwatch_namespace, args.cloudwatch_metric, num_unexpected)
 
 
@@ -136,14 +138,29 @@ def pooled_port_scan(args, ip_port_pairs):
     return open_ports_collector
 
 
-def print_results(expectations, open_ports_collector):
+def print_results(ip_to_instance_map, expectations, open_ports_collector):
     logging.info("Found %d open ports." % len(open_ports_collector))
     num_unexpected = 0
-    for is_expected, hpps in itertools.groupby(sorted(open_ports_collector, expectations.__contains__),
-                                               expectations.__contains__):
+    iterable = sorted(open_ports_collector, key=expectations.__contains__)
+    for is_expected, hpps in itertools.groupby(iterable, expectations.__contains__):
         logging.info("== %s ==" % ("EXPECTED" if is_expected else "UNEXPECTED"))
-        for hpp in hpps:
-            logging.info("%s:%s" % (hpp[0], hpp[1]))
+        for hpp in sorted(hpps):
+            instance_data = ip_to_instance_map[hpp[0]]
+            optional = []
+            stackName = [tag['Value'] for tag in instance_data.tags if tag['Key'] == 'aws:cloudformation:stack-name']
+            if stackName:
+                optional.append(stackName[0])
+            tagName = [tag['Value'] for tag in instance_data.tags if tag['Key'] == 'Name']
+            if tagName:
+                optional.append(tagName[0])
+            costCategory = [tag['Value'] for tag in instance_data.tags if tag['Key'] == 'CostCategory']
+            if costCategory:
+                optional.append(costCategory[0])
+
+            logging.info("%s:%s %s (%s) %s" % (hpp[0], hpp[1], instance_data.id, instance_data.vpc_id, ","
+                                                                                                       "".join(
+                optional)))
+
             if not is_expected:
                 num_unexpected += 1
     logging.info("Found %d unexpected open ports." % num_unexpected)
@@ -175,12 +192,12 @@ def parse_port_ranges(spec):
     return (i for r in ranges for i in range(int(r[0]), int(r[-1]) + 1))
 
 
-def find_public_ips():
+def find_ec2_instance_ips():
     ec2 = boto3.resource("ec2")
     instances = ec2.instances.filter(Filters=[
         {'Name': 'instance-state-name', 'Values': ['running']}
     ])
-    return (i.public_ip_address for i in instances if i.public_ip_address)
+    return {i.public_ip_address: i for i in instances if i.public_ip_address}
 
 
 def report_to_cloudwatch(cloudwatch_namespace, cloudwatch_metric, num_unexpected):
