@@ -84,8 +84,8 @@ def create_argparser():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--ports',
-                        default='20-22,25,42,53,80,123,143,389,443,993,995,'
-                                '3306,4040,4041,4443,5900-5906,7077,8080,'
+                        default='20-22,25,42,53,80,123,143,389,443,902-903,914,943,993,995,'
+                                '3306,4040,4041,4443,5800-5810,5900-5910,7077,8080,'
                                 '8081,18040',
                         help='The TCP port numbers to scan. Example: "1-1024,18080"')
     parser.add_argument('--timeout',
